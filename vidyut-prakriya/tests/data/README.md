@@ -52,3 +52,30 @@ implementation track (leṬ built on the perfect/reduplicated stem).
 Each test reads its TSV, derives each form via vidyut, and asserts the
 corpus `surface_form` appears in vidyut's output. Failures are listed all
 at once in the test output.
+
+## `dcs_subanta_corpus.tsv`: nominal forms from the DCS
+
+12,000 attested subanta forms (nouns, adjectives, pronouns, numerals) from
+the Digital Corpus of Sanskrit that vidyut-prakriya derives. The sample is
+deterministic: the five most frequent items of every (stem class, linga,
+vibhakti, vacana) cell, then the most frequent items overall. It is written by
+`scripts/check_dcs_subanta_coverage.py --corpus-out`, and
+`scripts/check_dcs_subanta_coverage.py --check-corpus` re-derives every row
+against a WASM build or the Python bindings. The method, coverage numbers and
+the misses are in `scripts/dcs_subanta_report.md`.
+
+- **Source:** Oliver Hellwig, *The Digital Corpus of Sanskrit (DCS)*,
+  2010 to 2024, <https://github.com/OliverHellwig/sanskrit>, CoNLL-U dump,
+  commit `8aeed5a`.
+- **License:** CC BY 4.0
+
+| Column | Meaning |
+|---|---|
+| `pratipadika` | the vidyut input: `basic:deva`, `nyap:ramA`, `taddhitanta:SrI/matup`, `krdanta:pra+ancu~/Bhvadi/kvin`, `krdanta:BA\/Adadi/unadi:qavatu` |
+| `linga`, `vibhakti`, `vacana` | vidyut enum names |
+| `form` | the derived form that matches the attestation (SLP1) |
+| `form_iast` | the DCS form (pausa form, or surface form where the DCS pausa form was reconstructed automatically) |
+| `lemma` | DCS lemma (IAST) |
+| `stem_class` | coarse stem class used in the report |
+| `tokens` | number of DCS tokens of this item |
+| `ref`, `sent_id` | DCS chapter citation and sentence id of the first attestation |
