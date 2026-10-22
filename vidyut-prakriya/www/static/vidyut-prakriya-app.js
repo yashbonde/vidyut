@@ -40,6 +40,23 @@ const dhatuGanaSutras = fetch("/static/data/dhatupatha-ganasutras.tsv").then(res
 const linganushasanam = fetch("/static/data/linganushasanam.tsv").then(resp => resp.text()).then(text => parseSutras(text));
 const unadipatha = fetch("/static/data/unadipatha.tsv").then(resp => resp.text()).then(text => parseSutras(text));
 
+// Turn dhatupatha-metadata.tsv (English meaning and DCS corpus count per
+// dhatu code) into a map. The demo still works if this file is missing.
+function parseDhatuMetadata(tsv) {
+    let metadata = {};
+    tsv.split(/\r?\n/).forEach(line => {
+        const [code, en, count] = line.split(/\t/);
+        if (!!code && code !== 'code') {
+            metadata[code] = { en: en || "", count: parseInt(count) || 0 };
+        }
+    });
+    return metadata;
+}
+const dhatuMetadata = fetch("/static/data/dhatupatha-metadata.tsv")
+    .then(resp => resp.ok ? resp.text() : "")
+    .then(text => parseDhatuMetadata(text))
+    .catch(() => ({}));
+
 // Parse a dhatupatha string into separate objects.
 function parseDhatus(vidyut, tsvText) {
     const ganaMap = {
@@ -84,7 +101,10 @@ function parseDhatus(vidyut, tsvText) {
                 normalDhatu,
                 gana,
                 antargana,
-                artha
+                artha,
+                // Filled in from dhatupatha-metadata.tsv, if available.
+                en: "",
+                count: 0,
             });
         }
     });
@@ -209,7 +229,15 @@ const App = () => ({
         this.vidyut = new Vidyut();
         console.log("Initialized vidyut-prakriya WASM bindings.");
 
-        this.dhatus = parseDhatus(this.vidyut, dhatupatha);
+        const dhatus = parseDhatus(this.vidyut, dhatupatha);
+        const metadata = await dhatuMetadata;
+        dhatus.forEach(d => {
+            if (metadata[d.code]) {
+                d.en = metadata[d.code].en;
+                d.count = metadata[d.code].count;
+            }
+        });
+        this.dhatus = dhatus;
 
         // TODO: set state earlier. But, our current implemenation needs to
         // wait for the dhatus to load so that we can set activeDhatu.
@@ -356,12 +384,18 @@ const App = () => ({
         }
     },
 
-    /** A filtered list of dhatus according to a user query. */
+    /**
+     * A filtered list of dhatus according to a user query. Results are
+     * ordered by corpus frequency (most frequent first), so that common roots
+     * come before rare homonyms. With no query, the list keeps the
+     * Dhatupatha order.
+     */
     filteredDhatus() {
         if (this.dhatuFilter !== null) {
             let slpQuery = Sanscript.t(this.dhatuFilter, 'devanagari', 'slp1');
             let hkQuery = Sanscript.t(this.dhatuFilter, 'hk', 'slp1');
-            return this.dhatus.filter(d =>
+            let enQuery = this.dhatuFilter.trim().toLowerCase();
+            const results = this.dhatus.filter(d =>
                 d.code.includes(slpQuery)
                 || d.aupadeshikaNoSvaras.includes(slpQuery)
                 || d.artha.includes(slpQuery)
@@ -369,7 +403,13 @@ const App = () => ({
                 || d.aupadeshikaNoSvaras.includes(hkQuery)
                 || d.artha.includes(hkQuery)
                 || d.normalDhatu.includes(hkQuery)
+                || (enQuery.length > 0 && d.en.toLowerCase().includes(enQuery))
             );
+            if (enQuery.length > 0) {
+                // `sort` is stable, so ties keep the Dhatupatha order.
+                results.sort((x, y) => y.count - x.count);
+            }
+            return results;
         } else {
             return this.dhatus;
         }
